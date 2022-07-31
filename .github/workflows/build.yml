@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - amd64
+          - arm64
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Build
+      run: |
+        GOOS=linux GOARCH=${{matrix.arch}} go build -ldflags "-s -w" -v -o lxdocker cmd/lxdocker/lxdocker.go
+        GOOS=linux GOARCH=${{matrix.arch}} go build -ldflags "-s -w" -v -o imgserver cmd/imgserver/imgserver.go
+    - name: Compress
+      run: tar -cvf lxdocker-linux-${{matrix.arch}}.tar.gz lxdocker imgserver
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        path: lxdocker-linux-${{matrix.arch}}.tar.gz
+        if-no-files-found: error
+
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          fail_on_unmatched_files: true
+          files: |
+            artifact/*.tar.gz
