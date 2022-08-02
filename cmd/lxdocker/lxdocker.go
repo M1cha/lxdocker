@@ -245,6 +245,21 @@ func writeHostFile(tarWriter *tar.Writer, fileMap map[string]bool, dst string, s
 	return nil
 }
 
+func writeBytesFile(tarWriter *tar.Writer, fileMap map[string]bool, dst string, src []byte, mode int64) error {
+	header := &tar.Header{
+		Name: dst,
+		Mode: mode,
+		Size: int64(len(src)),
+	}
+
+	err := writeTarFile(tarWriter, fileMap, header, bytes.NewReader(src))
+	if err != nil {
+		return fmt.Errorf("writing sbin/init: %w", err)
+	}
+
+	return nil
+}
+
 func generateRootfsTar(img v1.Image, w io.Writer, name string) error {
 	tarWriter := tar.NewWriter(w)
 	defer tarWriter.Close()
@@ -263,13 +278,22 @@ func generateRootfsTar(img v1.Image, w io.Writer, name string) error {
 	}
 
 	log.Debugf("write busybox")
-	err = writeHostFile(tarWriter, fileMap, "/busybox-lxd", "/tmp/busybox", 0755)
+	err = writeHostFile(tarWriter, fileMap, "/busybox-lxd", "/bin/busybox", 0755)
 	if err != nil {
 		return fmt.Errorf("failed to write busybox: %w", err)
 	}
 
-	log.Debugf("write busybox-script")
-	err = writeHostFile(tarWriter, fileMap, "/lxd-udhcpc-default.script", "/tmp/default.script", 0755)
+	log.Debugf("write udhcpc script wrapper")
+	err = writeBytesFile(tarWriter, fileMap, "/lxd-udhcpc-default.script", []byte(
+		`#!/busybox-lxd sh
+alias busybox='/busybox-lxd'
+source /lxd-udhcpc-default.script.real`), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to write busybox-script: %w", err)
+	}
+
+	log.Debugf("write udhcpc script")
+	err = writeHostFile(tarWriter, fileMap, "/lxd-udhcpc-default.script.real", "/etc/udhcpc/default.script", 0755)
 	if err != nil {
 		return fmt.Errorf("failed to write busybox-script: %w", err)
 	}
