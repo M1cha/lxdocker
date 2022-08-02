@@ -118,7 +118,8 @@ func imagesJsonHandler(w http.ResponseWriter, r *http.Request) {
 		productMap[name] = simplestreams.Product{
 			Aliases:         fmt.Sprintf("%s/current/default,%s/current,%s", name, name, name),
 			Architecture:    runtime.GOARCH,
-			OperatingSystem: "Docker",
+			OperatingSystem: fmt.Sprintf("docker:%s", name),
+			ReleaseTitle:    "latest",
 			Versions: map[string]simplestreams.ProductVersion{
 				versionName: simplestreams.ProductVersion{
 					Items: map[string]simplestreams.ProductVersionItem{
