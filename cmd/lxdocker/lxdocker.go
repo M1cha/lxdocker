@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"pkg/common"
 	"runtime"
@@ -37,6 +38,7 @@ import (
 const whiteoutPrefix = ".wh."
 
 var log *zap.SugaredLogger
+var imageFormat string
 
 func shellEscape(s string) string {
 	s = strings.Replace(s, "\\", "\\\\", -1)
@@ -429,13 +431,41 @@ func getImage(ociDir string, spec ImageSpec) (v1.Image, error) {
 	return img, nil
 }
 
-func generateRootfs(dst io.Writer, img v1.Image, name string) error {
+func generateRootfsGzip(dstPath string, img v1.Image, name string) error {
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer dst.Close()
+
 	gzipWriter := gzip.NewWriter(dst)
 	defer gzipWriter.Close()
 
-	err := generateRootfsTar(img, gzipWriter, name)
+	err = generateRootfsTar(img, gzipWriter, name)
 	if err != nil {
 		return fmt.Errorf("failed to generate rootfs: %w", err)
+	}
+
+	return nil
+}
+
+func generateRootfsSquashfs(dst string, img v1.Image, name string) error {
+	cmd := exec.Command("sqfstar", dst)
+	cmd.Stderr = os.Stderr
+
+	stdin, err := cmd.StdinPipe()
+
+	go func() {
+		err := generateRootfsTar(img, stdin, name)
+		stdin.Close()
+		if err != nil {
+			log.Fatalf("failed to generate rootfs tar: %w", err)
+		}
+	}()
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to write squashfs to file: %w", err)
 	}
 
 	return nil
@@ -637,21 +667,34 @@ func updateAll(ociDir string, specDir string, imageDir string) error {
 		}
 
 		// write rootfs
-		file, err := os.CreateTemp(imageDir, name)
-		if err != nil {
-			log.Errorf("failed to open `%s`: %w", name, err)
-			continue
+		rootfsPathTemp := filepath.Join(imageDir, fmt.Sprintf("%s.rootfs.tmp", name))
+		if _, err := os.Stat(rootfsPathTemp); err == nil {
+			err = os.Remove(rootfsPathTemp)
+			if err != nil {
+				log.Errorf("failed to delete old tmp rootfs from `%v`: %w", rootfsPathTemp, err)
+				continue
+			}
 		}
 
-		log.Infof("generate rootfs at %v", file.Name())
-		err = generateRootfs(file, img, name)
-		file.Close()
-		if err != nil {
-			log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
-			continue
+		log.Infof("generate rootfs at %v", rootfsPathTemp)
+		switch imageFormat {
+		case "squashfs":
+			err = generateRootfsSquashfs(rootfsPathTemp, img, name)
+			if err != nil {
+				log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
+				continue
+			}
+		case "gzip":
+			err = generateRootfsGzip(rootfsPathTemp, img, name)
+			if err != nil {
+				log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
+				continue
+			}
+		default:
+			log.Fatalf("unsupported rootfs format: %s", imageFormat)
 		}
 
-		rootfsHash, err := hashFile(file.Name())
+		rootfsHash, err := hashFile(rootfsPathTemp)
 		if err != nil {
 			log.Errorf("failed to hash rootfs for `%v`: %w", name, err)
 			continue
@@ -660,7 +703,7 @@ func updateAll(ociDir string, specDir string, imageDir string) error {
 		// XXX: the rootfs might already exist in case the metadata
 		//      changed but the result didn't. So do an atomic rename
 		rootfsFilename := fmt.Sprintf("%s-%v.rootfs", name, rootfsHash.Hex)
-		err = os.Rename(file.Name(), filepath.Join(imageDir, rootfsFilename))
+		err = os.Rename(rootfsPathTemp, filepath.Join(imageDir, rootfsFilename))
 		if err != nil {
 			log.Errorf("failed to rename rootfs for `%v`: %w", name, err)
 			continue
@@ -674,7 +717,7 @@ func updateAll(ociDir string, specDir string, imageDir string) error {
 			Filename:       rootfsFilename,
 		}
 
-		file, err = os.CreateTemp(imageDir, metadataFilename)
+		file, err := os.CreateTemp(imageDir, metadataFilename)
 		if err != nil {
 			log.Errorf("failed to open temp metadata file `%v`: %w", name, err)
 			continue
@@ -865,6 +908,7 @@ func main() {
 	rootCmd.Flags().StringVar(&ociDir, "cache", "", "path to OCI cache")
 	rootCmd.Flags().StringVar(&imageDir, "lxdimages", "", "path to directory for generated LXD images")
 	rootCmd.Flags().StringVar(&specDir, "specs", "", "path to directory with LXD image specifications")
+	rootCmd.Flags().StringVar(&imageFormat, "imageformat", "squashfs", "format of the generated rootfs'")
 
 	rootCmd.MarkFlagRequired("cache")
 	rootCmd.MarkFlagRequired("lxdimages")
