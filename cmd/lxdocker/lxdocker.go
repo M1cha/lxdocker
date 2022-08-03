@@ -134,7 +134,12 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 
 	for _, keyval := range config.Env {
 		key := strings.Split(keyval, "=")[0]
-		_, err = fmt.Fprintf(&data, "if [ -z \"${%s+x}\" ]; then export \"%s\"; fi\n", key, shellEscape(keyval))
+		// LXD sets PATH so we always have to overwrite it
+		if key == "PATH" {
+			_, err = fmt.Fprintf(&data, "export \"%s\"\n", shellEscape(keyval))
+		} else {
+			_, err = fmt.Fprintf(&data, "if [ -z \"${%s+x}\" ]; then export \"%s\"; fi\n", key, shellEscape(keyval))
+		}
 		check(err)
 	}
 
