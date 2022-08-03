@@ -159,6 +159,12 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	_, err = fmt.Fprintf(&data, "/busybox-lxd udhcpc -R -b -i eth0 -s /lxd-udhcpc-default.script\n")
 	check(err)
 
+	// mount original init to it's original location
+	// we don't copy it because our changes are persistent and we still
+	// want lxdockers init to run after a restart
+	_, err = fmt.Fprintf(&data, "if [ -f /lxd-realinit ]; then mount -o bind /lxd-realinit /sbin/init; fi\n")
+	check(err)
+
 	if spec.DisableSupervisor {
 		_, err = fmt.Fprintf(&data, "exec ")
 		check(err)
@@ -341,6 +347,10 @@ source /lxd-udhcpc-default.script.real`), 0755)
 			}
 			if err != nil {
 				return fmt.Errorf("reading tar: %w", err)
+			}
+
+			if filepath.Clean(header.Name) == "sbin/init" {
+				header.Name = "lxd-realinit"
 			}
 
 			err = writeTarFile(tarWriter, fileMap, header, tarReader)
