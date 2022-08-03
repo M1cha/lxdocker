@@ -1,8 +1,5 @@
 package main
 
-// TODO: write a cloud-init lxd container with this service(systemd cron, static-busybox, debian-update and image server)
-// TODO: implement image server
-
 import (
 	"archive/tar"
 	"bytes"
