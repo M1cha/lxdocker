@@ -451,6 +451,21 @@ func getImage(ociDir string, spec ImageSpec) (v1.Image, error) {
 	return img, nil
 }
 
+func generateRootfsTarCreate(dstPath string, img v1.Image, name string, spec ImageSpec) error {
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer dst.Close()
+
+	err = generateRootfsTar(img, dst, name, spec)
+	if err != nil {
+		return fmt.Errorf("failed to generate rootfs: %w", err)
+	}
+
+	return nil
+}
+
 func generateRootfsGzip(dstPath string, img v1.Image, name string, spec ImageSpec) error {
 	dst, err := os.Create(dstPath)
 	if err != nil {
@@ -706,6 +721,12 @@ func updateAll(ociDir string, specDir string, imageDir string) error {
 			}
 		case "gzip":
 			err = generateRootfsGzip(rootfsPathTemp, img, name, spec)
+			if err != nil {
+				log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
+				continue
+			}
+		case "tar":
+			err = generateRootfsTarCreate(rootfsPathTemp, img, name, spec)
 			if err != nil {
 				log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
 				continue
