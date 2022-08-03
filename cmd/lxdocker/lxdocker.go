@@ -123,7 +123,7 @@ func writeTarFile(tarWriter *tar.Writer, fileMap map[string]bool, header *tar.He
 	return nil
 }
 
-func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config) error {
+func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config, spec ImageSpec) error {
 	var data bytes.Buffer
 
 	_, err := fmt.Fprintf(&data, "#!/busybox-lxd sh\n\n")
@@ -159,6 +159,11 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	_, err = fmt.Fprintf(&data, "/busybox-lxd udhcpc -R -b -i eth0 -s /lxd-udhcpc-default.script\n")
 	check(err)
 
+	if spec.DisableSupervisor {
+		_, err = fmt.Fprintf(&data, "exec ")
+		check(err)
+	}
+
 	for _, arg := range config.Entrypoint {
 		_, err := fmt.Fprintf(&data, "\"%v\" ", shellEscape(arg))
 		check(err)
@@ -168,15 +173,17 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 		check(err)
 	}
 
-	_, err = fmt.Fprintf(&data, "&\n")
-	check(err)
+	if !spec.DisableSupervisor {
+		_, err = fmt.Fprintf(&data, "&\n")
+		check(err)
 
-	// send SIGTERM to child if we receive SIGPWR
-	// this makes `lxc stop` work
-	_, err = fmt.Fprintf(&data, "trap 'kill -15 $child' PWR\n")
-	check(err)
-	_, err = fmt.Fprintf(&data, "child=$!; wait \"$child\"\n")
-	check(err)
+		// send SIGTERM to child if we receive SIGPWR
+		// this makes `lxc stop` work
+		_, err = fmt.Fprintf(&data, "trap 'kill -15 $child' PWR\n")
+		check(err)
+		_, err = fmt.Fprintf(&data, "child=$!; wait \"$child\"\n")
+		check(err)
+	}
 
 	header := &tar.Header{
 		Name: "sbin/init",
@@ -264,7 +271,7 @@ func writeBytesFile(tarWriter *tar.Writer, fileMap map[string]bool, dst string, 
 	return nil
 }
 
-func generateRootfsTar(img v1.Image, w io.Writer, name string) error {
+func generateRootfsTar(img v1.Image, w io.Writer, name string, spec ImageSpec) error {
 	tarWriter := tar.NewWriter(w)
 	defer tarWriter.Close()
 
@@ -309,7 +316,7 @@ source /lxd-udhcpc-default.script.real`), 0755)
 	}
 
 	log.Debugf("write init")
-	err = writeInit(tarWriter, fileMap, config)
+	err = writeInit(tarWriter, fileMap, config, spec)
 	if err != nil {
 		return fmt.Errorf("failed to write /sbin/init: %w", err)
 	}
@@ -406,7 +413,8 @@ func currentPlatform() v1.Platform {
 }
 
 type ImageSpec struct {
-	Image string
+	Image             string
+	DisableSupervisor bool `yaml:"disable_supervisor"`
 }
 
 func getImage(ociDir string, spec ImageSpec) (v1.Image, error) {
@@ -433,7 +441,7 @@ func getImage(ociDir string, spec ImageSpec) (v1.Image, error) {
 	return img, nil
 }
 
-func generateRootfsGzip(dstPath string, img v1.Image, name string) error {
+func generateRootfsGzip(dstPath string, img v1.Image, name string, spec ImageSpec) error {
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -443,7 +451,7 @@ func generateRootfsGzip(dstPath string, img v1.Image, name string) error {
 	gzipWriter := gzip.NewWriter(dst)
 	defer gzipWriter.Close()
 
-	err = generateRootfsTar(img, gzipWriter, name)
+	err = generateRootfsTar(img, gzipWriter, name, spec)
 	if err != nil {
 		return fmt.Errorf("failed to generate rootfs: %w", err)
 	}
@@ -451,14 +459,14 @@ func generateRootfsGzip(dstPath string, img v1.Image, name string) error {
 	return nil
 }
 
-func generateRootfsSquashfs(dst string, img v1.Image, name string) error {
+func generateRootfsSquashfs(dst string, img v1.Image, name string, spec ImageSpec) error {
 	cmd := exec.Command("sqfstar", dst)
 	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()
 
 	go func() {
-		err := generateRootfsTar(img, stdin, name)
+		err := generateRootfsTar(img, stdin, name, spec)
 		stdin.Close()
 		if err != nil {
 			log.Fatalf("failed to generate rootfs tar: %w", err)
@@ -681,13 +689,13 @@ func updateAll(ociDir string, specDir string, imageDir string) error {
 		log.Infof("generate rootfs at %v", rootfsPathTemp)
 		switch imageFormat {
 		case "squashfs":
-			err = generateRootfsSquashfs(rootfsPathTemp, img, name)
+			err = generateRootfsSquashfs(rootfsPathTemp, img, name, spec)
 			if err != nil {
 				log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
 				continue
 			}
 		case "gzip":
-			err = generateRootfsGzip(rootfsPathTemp, img, name)
+			err = generateRootfsGzip(rootfsPathTemp, img, name, spec)
 			if err != nil {
 				log.Errorf("failed to generate rootfs for `%v`: %w", name, err)
 				continue
