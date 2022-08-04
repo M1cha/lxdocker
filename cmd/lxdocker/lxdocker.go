@@ -295,13 +295,13 @@ func generateRootfsTar(img v1.Image, w io.Writer, name string, spec ImageSpec) e
 	}
 
 	log.Debugf("write busybox")
-	err = writeHostFile(tarWriter, fileMap, "/busybox-lxd", "/bin/busybox", 0755)
+	err = writeHostFile(tarWriter, fileMap, "busybox-lxd", "/bin/busybox", 0755)
 	if err != nil {
 		return fmt.Errorf("failed to write busybox: %w", err)
 	}
 
 	log.Debugf("write udhcpc script wrapper")
-	err = writeBytesFile(tarWriter, fileMap, "/lxd-udhcpc-default.script", []byte(
+	err = writeBytesFile(tarWriter, fileMap, "lxd-udhcpc-default.script", []byte(
 		`#!/busybox-lxd sh
 alias busybox='/busybox-lxd'
 source /lxd-udhcpc-default.script.real`), 0755)
@@ -310,7 +310,7 @@ source /lxd-udhcpc-default.script.real`), 0755)
 	}
 
 	log.Debugf("write udhcpc script")
-	err = writeHostFile(tarWriter, fileMap, "/lxd-udhcpc-default.script.real", "/etc/udhcpc/default.script", 0755)
+	err = writeHostFile(tarWriter, fileMap, "lxd-udhcpc-default.script.real", "/etc/udhcpc/default.script", 0755)
 	if err != nil {
 		return fmt.Errorf("failed to write busybox-script: %w", err)
 	}
