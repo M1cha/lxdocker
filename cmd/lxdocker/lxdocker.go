@@ -156,7 +156,7 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	check(err)
 
 	// configure networking
-	_, err = fmt.Fprintf(&data, "/busybox-lxd udhcpc -R -b -i eth0 -s /lxd-udhcpc-default.script\n")
+	_, err = fmt.Fprintf(&data, "/busybox-lxd udhcpc -R -b -i eth0 -s /lxd-udhcpc-default.script -x hostname:$(/busybox-lxd hostname)\n")
 	check(err)
 
 	// mount original init to it's original location
