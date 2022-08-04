@@ -212,6 +212,24 @@ func writeMetadata(tarWriter *tar.Writer, name string, configFile *v1.ConfigFile
 		Properties: map[string]string{
 			"description": name,
 		},
+		Templates: map[string]*lxdapi.ImageMetadataTemplate{
+			"/etc/hostname": &lxdapi.ImageMetadataTemplate{
+				When: []string{
+					"create",
+					"copy",
+				},
+				CreateOnly: false,
+				Template:   "hostname.tpl",
+			},
+			"/etc/hosts": &lxdapi.ImageMetadataTemplate{
+				When: []string{
+					"create",
+					"copy",
+				},
+				CreateOnly: false,
+				Template:   "hosts.tpl",
+			},
+		},
 	}
 
 	data, err := yaml.Marshal(&metadata)
@@ -277,6 +295,24 @@ func writeBytesFile(tarWriter *tar.Writer, fileMap map[string]bool, dst string, 
 	return nil
 }
 
+func writeBytesFileGlobal(tarWriter *tar.Writer, dst string, src []byte, mode int64) error {
+	header := &tar.Header{
+		Name: dst,
+		Mode: mode,
+		Size: int64(len(src)),
+	}
+
+	if err := tarWriter.WriteHeader(header); err != nil {
+		return fmt.Errorf("failed to write tar header: %w", err)
+	}
+
+	if _, err := io.CopyN(tarWriter, bytes.NewReader(src), header.Size); err != nil {
+		return fmt.Errorf("failed to write tar contents: %w", err)
+	}
+
+	return nil
+}
+
 func generateRootfsTar(img v1.Image, w io.Writer, name string, spec ImageSpec) error {
 	tarWriter := tar.NewWriter(w)
 	defer tarWriter.Close()
@@ -319,6 +355,18 @@ source /lxd-udhcpc-default.script.real`), 0755)
 	err = writeMetadata(tarWriter, name, configFile)
 	if err != nil {
 		return fmt.Errorf("failed to write /sbin/init: %w", err)
+	}
+
+	log.Debugf("write hostname.tpl")
+	err = writeBytesFileGlobal(tarWriter, "templates/hostname.tpl", []byte("{{ container.name }}\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write hostname.tpl: %w", err)
+	}
+
+	log.Debugf("write hosts.tpl")
+	err = writeBytesFileGlobal(tarWriter, "templates/hosts.tpl", []byte("127.0.1.1    {{ container.name }}\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write hosts.tpl: %w", err)
 	}
 
 	log.Debugf("write init")
