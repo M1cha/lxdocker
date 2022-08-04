@@ -202,7 +202,7 @@ func main() {
 		},
 	}
 
-	rootCmd.Flags().StringVar(&address, "address", ":8080", "server listener address")
+	rootCmd.Flags().StringVar(&address, "address", ":443", "server listener address")
 	rootCmd.Flags().StringVar(&imagesDir, "lxdimages", "", "path to directory of generated LXD images")
 	rootCmd.Flags().StringVar(&key, "key", "", "path to TLS key")
 	rootCmd.Flags().StringVar(&cert, "cert", "", "path to TLS certificate")
