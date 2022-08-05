@@ -71,6 +71,7 @@ lxdocker anymore.
 For simple setups, the LXD host, the device running `lxdocker`, and the device
 running the `lxc` CLI are all the the system. This is also what the rest of the
 README assumes.
+[Here](https://github.com/M1cha/homeserver/blob/main/configs/lxd/instances/lxdocker.yaml) is the instance config I use for the lxdocker container.
 
 ## YAML image specification format
 Currently this is quite simple but may be extended as the need rises.
