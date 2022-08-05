@@ -44,6 +44,10 @@ LXD was made for system-containers, not application-containers, yet:
   works for both LXD and docker containers. As soon as I have finished writing
   that daemon I'll put a link here.
 
+# Why use lxdocker instead of native LXD images?
+- some software like [PhotoPrism](https://docs.photoprism.app/getting-started/#setup) is only available as docker images
+- It uses less resources. Even Alpine runs many services via openrc.
+
 # How does it work?
 
 Here's some facts:
