@@ -24,7 +24,7 @@ LXD was made for system-containers, not application-containers, yet:
   containers from each other. User namespaces are not enough since you also
   need a proper network setup at which point you might run into limitations
   mentioned in the previous point.
-- Docker is ineffecient by default. port-farwardings use a proxy server and the
+- Docker is ineffecient by default. port-forwardings use a proxy server and the
   docker daemon can use a lot of resources that might not be available to e.g.
   single-board-computers.
 - `podman` is pretty good and also supports apparmor, seccomp and user
@@ -69,8 +69,8 @@ generated images with a cron-job and to enable LXDs auto-update so you always
 have the latest images in your LXD image cache and don't have to worry about
 lxdocker anymore.
 For simple setups, the LXD host, the device running `lxdocker`, and the device
-running the `lxc` CLI are all the the system. This is also what the rest of the
-README assumes.
+running the `lxc` CLI are all the same system. This is also what the rest of
+this README assumes.
 [Here](https://github.com/M1cha/homeserver/blob/main/configs/lxd/instances/lxdocker.yaml) is the instance config I use for the lxdocker container.
 
 ## YAML image specification format
@@ -109,7 +109,7 @@ expects to run as PID 1 so it won't run without this option set to `true`.
 containers usually require the runtime to do certain initialization before they
 are run. What the script currently does:
 - set environment variables specified in the OCI image. Existing variables
-  won't be overridden so you can use LXDs image configuration to change their
+  won't be overwritten so you can use LXDs image configuration to change their
   values
 - set working directory as specified in the OCI image
 - mount shmfs to `/dev/shm`: That's required by a few containers
