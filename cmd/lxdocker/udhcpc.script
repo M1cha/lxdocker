@@ -22,8 +22,12 @@ bound|renew)
 	# Configure new IP address.
 	# Do it unconditionally even if the address hasn't changed,
 	# to also set subnet, broadcast, mtu, ...
-	busybox ifconfig "$interface" ${mtu:+mtu $mtu} \
-	        "$ip" netmask "$subnet" ${broadcast:+broadcast $broadcast}
+	if [ -n "$mtu" ]; then
+		busybox ip link set dev "$interface" "$mtu"
+	fi
+	busybox ip address add "${ip}$(ip_prefix)" \
+	        ${broadcast:+broadcast $broadcast} \
+	        dev "$interface"
 
 	# get current ("old") routes (after setting new IP)
 	crouter=$(busybox ip -4 route show dev "$interface" |
