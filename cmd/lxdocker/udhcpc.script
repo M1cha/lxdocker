@@ -6,6 +6,8 @@
 # Based on the busybox example scripts and the old udhcp source
 # package default.* scripts.
 
+# shellcheck disable=SC2154
+
 alias busybox='/busybox-lxd'
 
 RESOLV_CONF="/etc/resolv.conf"
