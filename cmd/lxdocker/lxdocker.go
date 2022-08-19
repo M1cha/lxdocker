@@ -169,6 +169,10 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	_, err = fmt.Fprintf(&data, "if [ -f /lxd-realinit ]; then mount -o bind /lxd-realinit /sbin/init; fi\n")
 	check(err)
 
+	// allow users to run code before startup
+	_, err = fmt.Fprintf(&data, "/busybox-lxd chmod 0755 /lxd-prelaunch; /lxd-prelaunch\n")
+	check(err)
+
 	if spec.DisableSupervisor {
 		_, err = fmt.Fprintf(&data, "exec ")
 		check(err)
@@ -232,6 +236,13 @@ func writeMetadata(tarWriter *tar.Writer, name string, configFile *v1.ConfigFile
 				},
 				CreateOnly: false,
 				Template:   "hosts.tpl",
+			},
+			"/lxd-prelaunch": &lxdapi.ImageMetadataTemplate{
+				When: []string{
+					"start",
+				},
+				CreateOnly: false,
+				Template:   "prelaunch.tpl",
 			},
 		},
 	}
@@ -360,6 +371,12 @@ func generateRootfsTar(img v1.Image, w io.Writer, name string, spec ImageSpec) e
 
 	log.Debugf("write hosts.tpl")
 	err = writeBytesFileGlobal(tarWriter, "templates/hosts.tpl", []byte("127.0.1.1    {{ container.name }}\n"), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write hosts.tpl: %w", err)
+	}
+
+	log.Debugf("write prelaunch.tpl")
+	err = writeBytesFileGlobal(tarWriter, "templates/prelaunch.tpl", []byte("{{ config_get(\"user.lxdocker_init_script\", \"#!/busybox-lxd sh\") }}\n"), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write hosts.tpl: %w", err)
 	}
