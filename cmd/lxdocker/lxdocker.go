@@ -173,6 +173,13 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	_, err = fmt.Fprintf(&data, "/busybox-lxd chmod 0755 /lxd-prelaunch; /lxd-prelaunch\n")
 	check(err)
 
+	// allow to load environment variables from a different location
+	// This can be used to load secrets that should not be part of the instance
+	// config.
+	// TODO: load them so the file can't execute any code.
+	_, err = fmt.Fprintf(&data, "[ -n \"$LXDOCKER_ENVFILE\" ] && source \"$LXDOCKER_ENVFILE\"\n")
+	check(err)
+
 	if spec.DisableSupervisor {
 		_, err = fmt.Fprintf(&data, "exec ")
 		check(err)
