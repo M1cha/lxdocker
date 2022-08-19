@@ -12,8 +12,20 @@ alias busybox='/busybox-lxd'
 
 RESOLV_CONF="/etc/resolv.conf"
 
+ipaddr_opts=""
+add_gatewayroute="0"
+
+if [ "${LXDOCKER_UDHCPC_NOPREFIXROUTE:-}" = "1" ]; then
+	ipaddr_opts="$ipaddr_opts noprefixroute"
+	add_gatewayroute="1"
+fi
+
 log() {
 	logger -t "udhcpc[$PPID]" -p "daemon.$1" "$interface: $2"
+}
+
+ip_prefix() {
+	busybox ipcalc -p "$ip" "$subnet" | busybox sed -n 's/^PREFIX=\(.*\)/\/\1/p'
 }
 
 case $1 in
@@ -25,9 +37,11 @@ bound|renew)
 	if [ -n "$mtu" ]; then
 		busybox ip link set dev "$interface" "$mtu"
 	fi
+	# shellcheck disable=SC2086
 	busybox ip address add "${ip}$(ip_prefix)" \
 	        ${broadcast:+broadcast $broadcast} \
-	        dev "$interface"
+	        dev "$interface" \
+		$ipaddr_opts
 
 	# get current ("old") routes (after setting new IP)
 	crouter=$(busybox ip -4 route show dev "$interface" |
@@ -41,6 +55,10 @@ bound|renew)
 		# special case for /32 subnets: use onlink keyword
 		[ ".$subnet" = .255.255.255.255 ] \
 			&& onlink=onlink || onlink=
+
+		if [ "$add_gatewayroute" = "1" ]; then
+			busybox ip -4 route add "$router" dev "$interface"
+		fi
 
 		# shellcheck disable=SC2086
 		busybox ip -4 route add default via "$router" dev "$interface" $onlink
