@@ -17,7 +17,6 @@ image specification anymore.
 
 ### Requirements
 - a statically linked busybox in `/bin/busybox` Debian package: `busybox-static`
-- `/etc/udhcpc/default.script`. Debian package: `udhcpc`
 - `sqfstar` if `squashfs` is used. Debian package: `squashfs-tools` (only on `unstable`)
 
 ### CLI options

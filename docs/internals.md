@@ -63,6 +63,7 @@ are run. What the script currently does:
   values
 - set working directory as specified in the OCI image
 - mount shmfs to `/dev/shm`: That's required by a few containers
+- mount tmpfs to `/tmp` and `/run`
 - disable IPv4 and IPv6 forwarding. Containers usually aren't used as routers
   and this prevents potential security issues by default. This is especially
   useful if you're exposing a container on your local network via a `macvlan`
@@ -70,6 +71,8 @@ are run. What the script currently does:
 - start `udhcpc` to configure `eth0`: Containers expect it to be setup already
 - bind-mount `/lxd-realinit` to `/sbin/init`: To prevent compatibility issues
   due to lxdocker having replaced that binary.
+- execute `/lxd-prelaunch`
+- source `$LXDOCKER_ENVFILE` (optional)
 - run entrypoint with optional arguments as specified in the OCI image
 - if `disable_supervisor: false`, supervises the entrypoint process
 
@@ -96,5 +99,11 @@ templates:
             - copy
         create_only: false
         template: hosts.tpl
+        properties: {}
+    /lxd-prelaunch:
+        when:
+            - start
+        create_only: false
+        template: prelaunch.tpl
         properties: {}
 ```
