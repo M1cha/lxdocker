@@ -153,6 +153,14 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	_, err = fmt.Fprintf(&data, "/busybox-lxd mount -t tmpfs shmfs /dev/shm\n")
 	check(err)
 
+	// mount tmpfs to runtime directories
+	_, err = fmt.Fprintf(&data, "/busybox-lxd mkdir -p /run /tmp\n")
+	check(err)
+	_, err = fmt.Fprintf(&data, "/busybox-lxd mount -t tmpfs tmpfs /tmp\n")
+	check(err)
+	_, err = fmt.Fprintf(&data, "/busybox-lxd mount -t tmpfs tmpfs /run\n")
+	check(err)
+
 	// containers rarely need to be routers
 	_, err = fmt.Fprintf(&data, "/busybox-lxd echo 0 > /proc/sys/net/ipv4/ip_forward\n")
 	check(err)
