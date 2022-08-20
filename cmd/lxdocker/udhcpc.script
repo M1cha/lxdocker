@@ -60,8 +60,10 @@ bound|renew)
 			busybox ip -4 route add "$router" dev "$interface"
 		fi
 
-		# shellcheck disable=SC2086
-		busybox ip -4 route add default via "$router" dev "$interface" $onlink
+		if [ "${UDHCPC_NO_DEFAULT_ROUTE:-}" != "1" ]; then
+			# shellcheck disable=SC2086
+			busybox ip -4 route add default via "$router" dev "$interface" $onlink
+		fi
 	fi
 
 	if [ "${UDHCPC_NO_DNS:-}" != "1" ]; then
