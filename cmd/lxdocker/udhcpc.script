@@ -64,17 +64,19 @@ bound|renew)
 		busybox ip -4 route add default via "$router" dev "$interface" $onlink
 	fi
 
-	# Update resolver configuration file
-	[ -n "$domain" ] && R="domain $domain" || R=""
-	for i in $dns; do
-		R="$R
-nameserver $i"
-	done
+	if [ "${UDHCPC_NO_DNS:-}" != "1" ]; then
+		# Update resolver configuration file
+		[ -n "$domain" ] && R="domain $domain" || R=""
+		for i in $dns; do
+			R="$R
+	nameserver $i"
+		done
 
-	if [ -x /sbin/resolvconf ]; then
-		echo "$R" | resolvconf -a "$interface.udhcpc"
-	else
-		echo "$R" > "$RESOLV_CONF"
+		if [ -x /sbin/resolvconf ]; then
+			echo "$R" | resolvconf -a "$interface.udhcpc"
+		else
+			echo "$R" > "$RESOLV_CONF"
+		fi
 	fi
 
 	log info "$1: IP=$ip/$subnet router=$router domain=\"$domain\" dns=\"$dns\" lease=$lease"
@@ -84,8 +86,12 @@ deconfig)
 	busybox ip link set "$interface" up
 	busybox ip -4 addr flush dev "$interface"
 	busybox ip -4 route flush dev "$interface"
-	[ -x /sbin/resolvconf ] &&
-		resolvconf -d "$interface.udhcpc"
+
+	if [ "${UDHCPC_NO_DNS:-}" != "1" ]; then
+		[ -x /sbin/resolvconf ] &&
+			resolvconf -d "$interface.udhcpc"
+	fi
+
 	log notice "deconfigured"
 	;;
 
