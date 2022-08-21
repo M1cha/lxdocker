@@ -215,6 +215,17 @@ func writeInit(tarWriter *tar.Writer, fileMap map[string]bool, config *v1.Config
 	}
 
 	header := &tar.Header{
+		Typeflag: tar.TypeDir,
+		Name:     "sbin",
+		Mode:     0755,
+	}
+
+	err = writeTarFile(tarWriter, fileMap, header, nil)
+	if err != nil {
+		return fmt.Errorf("writing sbin: %w", err)
+	}
+
+	header = &tar.Header{
 		Name: "sbin/init",
 		Mode: 0755,
 		Size: int64(data.Len()),
